@@ -4,11 +4,20 @@
  *
  ***************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
 #include "pthread.h"
+#include <math.h>
 
 #define MAX_SIZE 4096
+#define THREADS 8
 
 typedef double matrix[MAX_SIZE][MAX_SIZE];
+typedef struct eliminationArgs {
+    int start;
+    int end;
+    int k;
+    double k_val;
+} eliminationArgs;
 
 int N;              /*matrix size */
 int maxnum;         /*max number of element*/
@@ -17,9 +26,12 @@ int PRINT;          /*print switch */
 matrix A;           /*matrix A */
 double b[MAX_SIZE]; /*vector b */
 double y[MAX_SIZE]; /*vector y */
+pthread_t threads[THREADS]; /* vector threads */
+eliminationArgs eargs[THREADS]; /* vector divission thread arguments */
 
 /*forward declarations */
 void work(void);
+void *eliminationWork(void *args);
 void Init_Matrix(void);
 void Print_Matrix(void);
 void Init_Default(void);
@@ -38,21 +50,41 @@ int main(int argc, char **argv)
 
 void work(void)
 {
-    int i, j, k;
     /*Gaussian elimination algorithm, Algo 8.4 from Grama */
-    for (k = 0; k < N; k++)
+    for (int k = 0; k < N; k++)
     { /*Outer loop */
-        for (j = k + 1; j < N; j++)
-            A[k][j] = A[k][j] / A[k][k]; /*Division step */
-        y[k] = b[k] / A[k][k];
+        double k_value = A[k][k];
+        for (int j = k + 1; j < N; j++)
+            A[k][j] = A[k][j] / k_value; /*Division step */
+        y[k] = b[k] / k_value;
         A[k][k] = 1.0;
-        for (i = k + 1; i < N; i++)
+        int step = N / THREADS;
+        int n = 0;
+        for (int i = k + 1; i < N; i += step)  // This can be parallelized with k
         {
-            for (j = k + 1; j < N; j++)
-                A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
-            b[i] = b[i] - A[i][k] * y[k];
-            A[i][k] = 0.0;
+            eargs[n].start = i;
+            eargs[n].end = i + step;
+            eargs[n].k = k;
+            pthread_create(&threads[n], NULL, eliminationWork, &eargs[n]);
+            n++;
         }
+        for (int j = 0; j < n; j++) {
+            pthread_join(threads[j], NULL);
+        }
+    }
+}
+
+void *eliminationWork(void *args)
+{
+    eliminationArgs *data = (eliminationArgs*)args;
+    int start = data->start;
+    int end = data->end;
+    int k = data->k;
+    for (int i = start; i < end && i < N; i++) {
+        for (int j = k + 1; j < N; j++)
+            A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
+        b[i] = b[i] - A[i][k] * y[k];
+        A[i][k] = 0.0;
     }
 }
 
@@ -158,7 +190,7 @@ int Read_Options(int argc, char **argv)
             case 'D':
                 printf("\nDefault: n = %d ", N);
                 printf("\n Init = rand");
-                printf("\n maxnum = 5 ");
+                printf("\n maxnum = 15 ");
                 printf("\n P = 0 \n\n");
                 exit(0);
                 break;
