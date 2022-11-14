@@ -10,6 +10,7 @@ threads:
 gauss:
 	gcc -O2 -o gaussianseq.exe gaussianseq.c -lpthread
 	gcc -O2 -o gaussianpar.exe gaussianpar.c -lpthread
+	gcc -O2 -o gaussianpar.exe gaussianpar2.c -lpthread
 qsort:
 	gcc -O2 -o qsortseq.exe qsortseq.c -lpthread
 	gcc -O2 -o qsortpar.exe qsortpar.c -lpthread
