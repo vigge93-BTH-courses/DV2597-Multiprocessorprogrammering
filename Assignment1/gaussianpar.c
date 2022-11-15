@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "pthread.h"
 #include <math.h>
+#include <string.h>
 
 #define MAX_SIZE 4096
 #define THREADS 8

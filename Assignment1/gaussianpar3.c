@@ -72,6 +72,7 @@ void work(void)
         eargs[n].running = 1;
         // eargs[i].active = 0;
         pthread_mutex_lock(&mutexes_2[n]);
+        pthread_mutex_lock(&mutexes_1[n]);
         pthread_create(&threads[n], NULL, eliminationWork, &eargs[n]);
     }
     for (int i = 0; i < THREADS; i++) {
@@ -94,23 +95,23 @@ void work(void)
             eargs[n].start = i;
             eargs[n].end = i + step;
             eargs[n].k = k;
-            pthread_mutex_lock(&mutexes_1[n]);
+            // pthread_mutex_lock(&mutexes_1[n]);
             pthread_mutex_lock(&mutexes_2[n]);
-            pthread_cond_signal(&conds_1[n]);
+            // pthread_cond_signal(&conds_1[n]);
             pthread_mutex_unlock(&mutexes_1[n]);
             n++;
         }
-        // printf("n %d\n", n);
+        // printf("n1 %d\n", n);
         for (int j = n; j < THREADS; j++) {
             if (eargs[j].running == 1) {
                 eargs[j].running = 0;
-                pthread_mutex_lock(&mutexes_1[j]);
-                pthread_cond_signal(&conds_1[j]);
+                // pthread_mutex_lock(&mutexes_1[j]);
+                // pthread_cond_signal(&conds_1[j]);
                 pthread_mutex_unlock(&mutexes_1[j]);
                 pthread_join(threads[j], NULL);
             }
         }
-        // printf("n %d\n", n);
+        // printf("n2 %d\n", n);
         for (int j = 0; j < n; j++) {
             // pthread_cond_wait(&conds_2[j], &mutexes_2[j]); // Wait for thread to finish
             pthread_mutex_lock(&mutexes_2[j]);
@@ -128,7 +129,8 @@ void *eliminationWork(void *args)
     pthread_mutex_unlock(&mutexes_2[n]);
     while (data->running == 1) {
         // Wait for program to signal run
-        pthread_cond_wait(&conds_1[n], &mutexes_1[n]);
+        // pthread_cond_wait(&conds_1[n], &mutexes_1[n]);
+        pthread_mutex_lock(&mutexes_1[n]);
         pthread_mutex_unlock(&mutexes_1[n]);
         if (data->running == 0) return NULL;
         int start = data->start;
@@ -143,6 +145,7 @@ void *eliminationWork(void *args)
         }
         // pthread_mutex_lock(&mutexes_2[n]);
         // pthread_cond_signal(&conds_2[n]); // Signal thread finished
+        pthread_mutex_lock(&mutexes_1[n]);
         pthread_mutex_unlock(&mutexes_2[n]);
     }
 }
