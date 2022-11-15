@@ -1,7 +1,7 @@
 /***************************************************************************
  *
  * Parallel version of Gaussian elimination
- *
+ * Don't recreate threads, no deadlock
  ***************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>

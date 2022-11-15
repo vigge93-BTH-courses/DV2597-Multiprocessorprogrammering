@@ -1,7 +1,7 @@
 /***************************************************************************
  *
  * Parallel version of Gaussian elimination
- * Naive implementation
+ * Naive implementation \w cut-off
  ***************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,14 +10,14 @@
 #include <string.h>
 
 #define MAX_SIZE 4096
-#define THREADS 8
+#define THREADS 16
+#define MIN_SPAN 256
 
 typedef double matrix[MAX_SIZE][MAX_SIZE];
 typedef struct eliminationArgs {
     int start;
     int end;
     int k;
-    double k_val;
 } eliminationArgs;
 
 int N;              /*matrix size */
@@ -59,18 +59,29 @@ void work(void)
             A[k][j] = A[k][j] / k_value; /*Division step */
         y[k] = b[k] / k_value;
         A[k][k] = 1.0;
-        int step = N / THREADS;
+        double eliminations = N-k;
+        int span = ceil(eliminations / THREADS);
+        span = fmax(span, MIN_SPAN);
         int n = 0;
-        for (int i = k + 1; i < N; i += step)  // This can be parallelized with k
-        {
-            eargs[n].start = i;
-            eargs[n].end = i + step;
-            eargs[n].k = k;
-            pthread_create(&threads[n], NULL, eliminationWork, &eargs[n]);
-            n++;
-        }
-        for (int j = 0; j < n; j++) {
-            pthread_join(threads[j], NULL);
+        if (eliminations > MIN_SPAN) {
+            for (int i = k + 1; i < N; i += span)  // This can be parallelized with k
+            {
+                eargs[n].start = i;
+                eargs[n].end = i + span;
+                eargs[n].k = k;
+                pthread_create(&threads[n], NULL, eliminationWork, &eargs[n]);
+                n++;
+            }
+            for (int j = 0; j < n; j++) {
+                pthread_join(threads[j], NULL);
+            }
+        } else {
+            for (int i = k+1; i < N; i++) {
+                for (int j = k + 1; j < N; j++)
+                    A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
+                b[i] = b[i] - A[i][k] * y[k];
+                A[i][k] = 0.0;
+            }
         }
     }
 }
@@ -81,7 +92,8 @@ void *eliminationWork(void *args)
     int start = data->start;
     int end = data->end;
     int k = data->k;
-    for (int i = start; i < end && i < N; i++) {
+    end = end < N ? end : N;
+    for (int i = start; i < end; i++) {
         for (int j = k + 1; j < N; j++)
             A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
         b[i] = b[i] - A[i][k] * y[k];
@@ -92,10 +104,10 @@ void *eliminationWork(void *args)
 void Init_Matrix()
 {
     int i, j;
-    printf("\nsize = %dx%d ", N, N);
-    printf("\nmaxnum = %d \n", maxnum);
-    printf("Init = %s \n", Init);
-    printf("Initializing matrix...");
+    // printf("\nsize = %dx%d ", N, N);
+    // printf("\nmaxnum = %d \n", maxnum);
+    // printf("Init = %s \n", Init);
+    // printf("Initializing matrix...");
     if (strcmp(Init, "rand") == 0)
     {
         for (i = 0; i < N; i++)
