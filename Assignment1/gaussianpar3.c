@@ -19,7 +19,6 @@ typedef struct eliminationArgs {
     int k;
     int n;
     int running;
-    // int active;
 } eliminationArgs;
 
 int N;              /*matrix size */
@@ -33,8 +32,6 @@ pthread_t threads[THREADS]; /* vector threads */
 eliminationArgs eargs[THREADS]; /* vector divission thread arguments */
 pthread_mutex_t mutexes_1[THREADS];
 pthread_mutex_t mutexes_2[THREADS];
-pthread_cond_t conds_1[THREADS];
-pthread_cond_t conds_2[THREADS];
 
 
 /*forward declarations */
@@ -47,12 +44,9 @@ int Read_Options(int, char **);
 
 int main(int argc, char **argv)
 {
-    int i, timestart, timeend, iter;
     for (int j = 0; j < THREADS; j++) {
         pthread_mutex_init(&mutexes_1[j], NULL);
         pthread_mutex_init(&mutexes_2[j], NULL);
-        pthread_cond_init(&conds_1[j], NULL);
-        pthread_cond_init(&conds_2[j], NULL);
     }
     Init_Default();           /*Init default values */
     Read_Options(argc, argv); /*Read arguments */
@@ -70,17 +64,15 @@ void work(void)
         eargs[n].k = -1;
         eargs[n].n = n;
         eargs[n].running = 1;
-        // eargs[i].active = 0;
         pthread_mutex_lock(&mutexes_2[n]);
         pthread_mutex_lock(&mutexes_1[n]);
         pthread_create(&threads[n], NULL, eliminationWork, &eargs[n]);
     }
+    // Wait until all threads has started
     for (int i = 0; i < THREADS; i++) {
-        // pthread_cond_wait(&conds_2[i], &mutexes_2[i]); // Wait for thread to start
         pthread_mutex_lock(&mutexes_2[i]);
         pthread_mutex_unlock(&mutexes_2[i]);
     }
-    /*Gaussian elimination algorithm, Algo 8.4 from Grama */
     for (int k = 0; k < N; k++)
     { /*Outer loop */
         double k_value = A[k][k];
@@ -90,30 +82,24 @@ void work(void)
         A[k][k] = 1.0;
         int step = N / THREADS;
         int n = 0;
-        for (int i = k + 1; i < N; i += step)  // This can be parallelized with k
+        for (int i = k + 1; i < N; i += step)
         {
             eargs[n].start = i;
             eargs[n].end = i + step;
             eargs[n].k = k;
-            // pthread_mutex_lock(&mutexes_1[n]);
             pthread_mutex_lock(&mutexes_2[n]);
-            // pthread_cond_signal(&conds_1[n]);
-            pthread_mutex_unlock(&mutexes_1[n]);
+            pthread_mutex_unlock(&mutexes_1[n]); // Start thread execution
             n++;
         }
-        // printf("n1 %d\n", n);
         for (int j = n; j < THREADS; j++) {
             if (eargs[j].running == 1) {
                 eargs[j].running = 0;
-                // pthread_mutex_lock(&mutexes_1[j]);
-                // pthread_cond_signal(&conds_1[j]);
-                pthread_mutex_unlock(&mutexes_1[j]);
+                pthread_mutex_unlock(&mutexes_1[j]); // Allow unused threads to exit
                 pthread_join(threads[j], NULL);
             }
         }
-        // printf("n2 %d\n", n);
+        // Wait for threads to finish
         for (int j = 0; j < n; j++) {
-            // pthread_cond_wait(&conds_2[j], &mutexes_2[j]); // Wait for thread to finish
             pthread_mutex_lock(&mutexes_2[j]);
             pthread_mutex_unlock(&mutexes_2[j]);
         }
@@ -124,27 +110,22 @@ void *eliminationWork(void *args)
 {
     eliminationArgs *data = (eliminationArgs*)args;
     int n = data->n;
-    // pthread_mutex_lock(&mutexes_2[n]);
-    // pthread_cond_signal(&conds_2[n]); // Signal thread started
     pthread_mutex_unlock(&mutexes_2[n]);
     while (data->running == 1) {
         // Wait for program to signal run
-        // pthread_cond_wait(&conds_1[n], &mutexes_1[n]);
         pthread_mutex_lock(&mutexes_1[n]);
         pthread_mutex_unlock(&mutexes_1[n]);
         if (data->running == 0) return NULL;
         int start = data->start;
         int end = data->end;
         int k = data->k;
-        // printf("Start %d, End %d, k %d\n", start, end, k);
         for (int i = start; i < end && i < N; i++) {
             for (int j = k + 1; j < N; j++)
                 A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
             b[i] = b[i] - A[i][k] * y[k];
             A[i][k] = 0.0;
-        }
-        // pthread_mutex_lock(&mutexes_2[n]);
-        // pthread_cond_signal(&conds_2[n]); // Signal thread finished
+        } 
+        // Signal thread finished
         pthread_mutex_lock(&mutexes_1[n]);
         pthread_mutex_unlock(&mutexes_2[n]);
     }

@@ -12,11 +12,10 @@ gauss:
 	gcc -O2 -o gaussianpar.exe gaussianpar.c -lpthread
 	gcc -O2 -o gaussianpar2.exe gaussianpar2.c -lpthread
 	gcc -O2 -o gaussianpar3.exe gaussianpar3.c -lpthread
-	gcc -O2 -o gaussianpar4.exe gaussianpar4.c -lpthread
 qsort:
 	gcc -O2 -o qsortseq.exe qsortseq.c -lpthread
 	gcc -O2 -o qsortpar1.exe qsortpar1.c -lpthread
-	gcc -O2 -o qsortpar3.exe qsortpar3.c -lpthread
+	gcc -O2 -o qsortpar2.exe qsortpar2.c -lpthread
 
 clean:
 	rm *.exe

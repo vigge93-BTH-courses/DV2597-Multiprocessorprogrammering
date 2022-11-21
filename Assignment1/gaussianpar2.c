@@ -19,7 +19,6 @@ typedef struct eliminationArgs {
     int k;
     int n;
     int running;
-    // int active;
 } eliminationArgs;
 
 int N;              /*matrix size */
@@ -70,16 +69,13 @@ void work(void)
         eargs[n].k = -1;
         eargs[n].n = n;
         eargs[n].running = 1;
-        // eargs[i].active = 0;
         pthread_mutex_lock(&mutexes_2[n]);
         pthread_create(&threads[n], NULL, eliminationWork, &eargs[n]);
     }
     for (int i = 0; i < THREADS; i++) {
-        // pthread_cond_wait(&conds_2[i], &mutexes_2[i]); // Wait for thread to start
         pthread_mutex_lock(&mutexes_2[i]);
         pthread_mutex_unlock(&mutexes_2[i]);
     }
-    /*Gaussian elimination algorithm, Algo 8.4 from Grama */
     for (int k = 0; k < N; k++)
     { /*Outer loop */
         double k_value = A[k][k];
@@ -89,7 +85,7 @@ void work(void)
         A[k][k] = 1.0;
         int step = N / THREADS;
         int n = 0;
-        for (int i = k + 1; i < N; i += step)  // This can be parallelized with k
+        for (int i = k + 1; i < N; i += step)
         {
             eargs[n].start = i;
             eargs[n].end = i + step;
@@ -100,7 +96,6 @@ void work(void)
             pthread_mutex_unlock(&mutexes_1[n]);
             n++;
         }
-        // printf("n %d\n", n);
         for (int j = n; j < THREADS; j++) {
             if (eargs[j].running == 1) {
                 eargs[j].running = 0;
@@ -110,9 +105,7 @@ void work(void)
                 pthread_join(threads[j], NULL);
             }
         }
-        // printf("n %d\n", n);
         for (int j = 0; j < n; j++) {
-            // pthread_cond_wait(&conds_2[j], &mutexes_2[j]); // Wait for thread to finish
             pthread_mutex_lock(&mutexes_2[j]);
             pthread_mutex_unlock(&mutexes_2[j]);
         }
@@ -123,8 +116,6 @@ void *eliminationWork(void *args)
 {
     eliminationArgs *data = (eliminationArgs*)args;
     int n = data->n;
-    // pthread_mutex_lock(&mutexes_2[n]);
-    // pthread_cond_signal(&conds_2[n]); // Signal thread started
     pthread_mutex_unlock(&mutexes_2[n]);
     while (data->running == 1) {
         // Wait for program to signal run
@@ -134,15 +125,12 @@ void *eliminationWork(void *args)
         int start = data->start;
         int end = data->end;
         int k = data->k;
-        // printf("Start %d, End %d, k %d\n", start, end, k);
         for (int i = start; i < end && i < N; i++) {
             for (int j = k + 1; j < N; j++)
                 A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
             b[i] = b[i] - A[i][k] * y[k];
             A[i][k] = 0.0;
         }
-        // pthread_mutex_lock(&mutexes_2[n]);
-        // pthread_cond_signal(&conds_2[n]); // Signal thread finished
         pthread_mutex_unlock(&mutexes_2[n]);
     }
 }

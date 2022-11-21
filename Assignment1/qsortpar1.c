@@ -30,7 +30,6 @@ typedef struct ThreadArgs
 
 static int *v;
 pthread_t threads[THREADS];
-// ThreadArgs threadArgs[THREADS];
 volatile sig_atomic_t nextThread = 0;
 
 static void
@@ -111,10 +110,8 @@ quick_sort(void *params)
         }
         else
         { // Run in parallel
-            // printf("Starting thread %d\n", nThread-1);
             localThreads[0] = nThread - 1;
             pthread_create(&threads[nThread-1], NULL, quick_sort, &args[0]);
-            // printf("Started thread %d\n", nThread-1);
         }
     }
     if (pivot_index < high)
@@ -130,10 +127,8 @@ quick_sort(void *params)
         }
         else
         { // Run in parallel
-            // printf("Starting thread %d\n", nThread-1);
             localThreads[1] = nThread - 1;
             pthread_create(&threads[nThread-1], NULL, quick_sort, &args[1]);
-            // printf("Started thread %d\n", nThread-1);
         }
     }
     for (int i = 0; i < 2; i++) {
@@ -148,12 +143,10 @@ quick_sort(void *params)
 int main(int argc, char **argv)
 {
     init_array();
-    // print_array();
     ThreadArgs args;
     args.v = v;
     args.low = 0;
     args.high = MAX_ITEMS - 1;
     args.depth = 1;
     quick_sort(&args);
-    // print_array();
 }

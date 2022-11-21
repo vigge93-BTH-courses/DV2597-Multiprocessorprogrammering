@@ -28,7 +28,7 @@ matrix A;           /*matrix A */
 double b[MAX_SIZE]; /*vector b */
 double y[MAX_SIZE]; /*vector y */
 pthread_t threads[THREADS]; /* vector threads */
-eliminationArgs eargs[THREADS]; /* vector divission thread arguments */
+eliminationArgs eargs[THREADS]; /* vector division thread arguments */
 
 /*forward declarations */
 void work(void);
@@ -51,7 +51,6 @@ int main(int argc, char **argv)
 
 void work(void)
 {
-    /*Gaussian elimination algorithm, Algo 8.4 from Grama */
     for (int k = 0; k < N; k++)
     { /*Outer loop */
         double k_value = A[k][k];
