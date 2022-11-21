@@ -10,7 +10,7 @@
 #define KILO (1024)
 #define MEGA (1024 * 1024)
 #define MAX_ITEMS (64 * MEGA)
-#define SMALLEST_ARRAY (MAX_ITEMS/512) // Minimum block size
+#define SMALLEST_ARRAY (MAX_ITEMS/(1024)) // Minimum block size
 #define swap(v, a, b) \
     {                 \
         unsigned tmp; \
@@ -102,7 +102,6 @@ quick_sort(void *params)
         args[0].high = pivot_index - 1;
         if (pivot_index - low < SMALLEST_ARRAY)
         { // Run in sequential
-            quick_sort(&args[0]);
         }
         else
         { // Run in parallel
@@ -127,6 +126,7 @@ quick_sort(void *params)
             // printf("Started thread %d\n", nThread-1);
         }
     }
+    if (low < pivot_index && localThreads[0] == -1) quick_sort(&args[0]);
     for (int i = 0; i < 2; i++) {
         if (localThreads[i] != -1) {
             // void **retval;

@@ -61,7 +61,7 @@ void work(void)
         A[k][k] = 1.0;
         int step = N / THREADS;
         int n = 0;
-        for (int i = k + 1; i < N; i += step)  // This can be parallelized with k
+        for (int i = k + 1; i < N; i += step) 
         {
             eargs[n].start = i;
             eargs[n].end = i + step;
