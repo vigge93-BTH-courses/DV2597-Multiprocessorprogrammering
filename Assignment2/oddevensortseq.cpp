@@ -19,7 +19,6 @@ void oddeven_sort(std::vector<int>& numbers)
 
 void print_sort_status(std::vector<int> numbers)
 {
-    numbers.size()
     std::cout << "The input is sorted?: " << (std::is_sorted(numbers.begin(), numbers.end()) == 0 ? "False" : "True") << std::endl;
 }
 
