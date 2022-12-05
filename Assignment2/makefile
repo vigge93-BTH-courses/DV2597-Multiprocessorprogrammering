@@ -7,10 +7,20 @@ oddpar: oddevensortpar.cu
 odd: oddseq oddpar
 gaussseq: gaussjordanseq.c
 	gcc -O2 -o gaussjordanseq.exe gaussjordanseq.c
-r: odd
+gausspar: gaussjordanpar.cu
+	nvcc -lineinfo -o gaussjordanpar gaussjordanpar.cu
+gauss: gaussseq gausspar
+ro: odd
 	./oddevensortpar.exe
 	./oddevensortpar2.exe
 	./oddevensortseq.exe
+rg: gauss
+	./gaussjordanseq.exe
+	./gaussjordanpar.exe
+rgc: gauss
+	./gaussjordanseq.exe -P 1 > seq
+	./gaussjordanpar.exe -P 1 > par
+	FC par seq
 clean:
 	rm *.exe
 	rm *.exp
