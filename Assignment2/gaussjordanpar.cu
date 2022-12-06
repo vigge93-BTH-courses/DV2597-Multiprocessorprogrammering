@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * Sequential version of Gauss-Jordan row reduction
+ * Paralell version of Gauss-Jordan row reduction
  *
  ***************************************************************************/
 
@@ -31,6 +31,7 @@ int Read_Options(int, char**);
 int
 main(int argc, char** argv)
 {
+    srand(1);
     printf("Gauss Jordan\n");
     // int i, timestart, timeend, iter;
 
@@ -51,17 +52,12 @@ __global__
 void division_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stride) {
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x + k; // start thread index at k since all indexes < k is already eliminated.
     if (t_idx >= N) return; // Guard clause
-    // printf("Div: %i %i %i,\n", t_idx, k, stride);
     for (int j = t_idx + 1; j < N; j += stride) {
-        // printf("div A_d pre: %i %i %f\n", k, j, A_d[getIndex(k, j)]);
         A_d[getIndex(k, j)] = A_d[getIndex(k, j)] / A_d[getIndex(k, k)]; /* Division step */
-        // printf("div A_d post: %i %i %f\n", k, j, A_d[getIndex(k, j)]);
     }
     if (t_idx == k) { // Only execute once per kernel launch
-        // printf("div y_d pre: %i %f %f %f\n", k, y_d[k], b_d[k], A_d[getIndex(k, k)]);
         y_d[k] = b_d[k] / A_d[getIndex(k, k)];
         A_d[getIndex(k, k)] = 1.0;
-        // printf("div y_d post: %i %f\n", k, y_d[k]);
     }
 }
 
@@ -69,17 +65,11 @@ __global__
 void elimination_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stride) {
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x + k;
     if (t_idx >= N) return; // Guard clause
-    // printf("El: %i %i %i,\n", t_idx, k, stride);
     for (int i = t_idx + 1; i < N; i += stride) {
         for (int j = k + 1; j < N; j++) {
-            // printf("el A_d pre: %i %i %i %f\n", k, i, j, A_d[getIndex(i, j)]);
             A_d[getIndex(i, j)] = A_d[getIndex(i, j)] - A_d[getIndex(i, k)] * A_d[getIndex(k, j)]; /* Elimination step */
-            // printf("el A_d post: %i %i %i %f\n", k, i, j, A_d[getIndex(i, j)]);
         }
-
-        // printf("el b_d pre: %i %i %f\n", k, i, b_d[i]);
         b_d[i] = b_d[i] - A_d[getIndex(i, k)] * y_d[k];
-        // printf("el b_d post: %i %i %f\n", k, i, b_d[i]);
         A_d[getIndex(i, k)] = 0.0;
     }
 }
@@ -88,16 +78,11 @@ __global__
 void jordan_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stride) {
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x;
     if (t_idx >= k) return; // Guard clause
-    // printf("Jor: %i %i %i,\n", t_idx, k, stride);
     for (int i = t_idx; i < k; i += stride) {
         for (int j = k + 1; j < N; j++) {
-            // printf("jor A_d pre: %i %i %i %f\n", k, i, j, A_d[getIndex(i, j)]);
             A_d[getIndex(i, j)] = A_d[getIndex(i, j)] - A_d[getIndex(i, k)] * A_d[getIndex(k, j)]; /* Additional Elimination for Gauss-Jordan */
-            // printf("jor A_d post: %i %i %i %f\n", k, i, j, A_d[getIndex(i, j)]);
         }
-        // printf("jor y_d pre: %i %i %f %f %f\n", k, i, A_d[getIndex(i, k)], y_d[k], y_d[i]);
         y_d[i] = y_d[i] - A_d[getIndex(i, k)] * y_d[k];
-        // printf("jor y_d post: %i %i %f %f %f\n", k, i, A_d[getIndex(i, k)], y_d[k], y_d[i]);
         A_d[getIndex(i, k)] = 0.0;
     }
 }
@@ -107,7 +92,7 @@ work(void)
 {
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
     int blocks = 1;
-    int threads_per_block = 512;
+    int threads_per_block = 48;
     int stride = blocks*threads_per_block;
     double *A_d;
     double *b_d, *y_d;
@@ -126,7 +111,7 @@ work(void)
         elimination_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-        jordan_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
+        // jordan_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
     }
     for (int i = 0; i < MAX_SIZE; i++) {

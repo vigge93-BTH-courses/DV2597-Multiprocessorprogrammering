@@ -30,6 +30,7 @@ int Read_Options(int, char**);
 int
 main(int argc, char** argv)
 {
+    srand(1);
     printf("Gauss Jordan\n");
     int i, timestart, timeend, iter;
 
@@ -41,29 +42,43 @@ main(int argc, char** argv)
         Print_Matrix();
 }
 
+void division(int k) {
+    for (int j = k + 1; j < N; j++)
+        A[k][j] = A[k][j] / A[k][k]; /* Division step */
+    y[k] = b[k] / A[k][k];
+    A[k][k] = 1.0;
+}
+
+void elimination(int k) {
+    for (int i = k + 1; i < N; i++) {
+        for (int j = k + 1; j < N; j++)
+            A[i][j] = A[i][j] - A[i][k] * A[k][j]; /* Elimination step */
+        b[i] = b[i] - A[i][k] * y[k];
+        A[i][k] = 0.0;
+    }
+}
+
+void jordan(int k) {
+    for (int i = 0; i < k; i++) {
+        for (int j = k + 1; j < N; j++)
+            A[i][j] = A[i][j] - A[i][k] * A[k][j]; /* Additional Elimination for Gauss-Jordan */
+        y[i] = y[i] - A[i][k] * y[k];
+        A[i][k] = 0.0;
+    }
+}
+
 void
 work(void)
 {
-    int i, j, k;
+    int i, k;
 
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
     for (k = 0; k < N; k++) { /* Outer loop */
-        for (j = k + 1; j < N; j++)
-            A[k][j] = A[k][j] / A[k][k]; /* Division step */
-        y[k] = b[k] / A[k][k];
-        A[k][k] = 1.0;
-        for (i = k + 1; i < N; i++) {
-            for (j = k + 1; j < N; j++)
-                A[i][j] = A[i][j] - A[i][k] * A[k][j]; /* Elimination step */
-            b[i] = b[i] - A[i][k] * y[k];
-            A[i][k] = 0.0;
-        }
-        for (i = 0; i < k; i++) {
-            for (j = k + 1; j < N; j++)
-                A[i][j] = A[i][j] - A[i][k] * A[k][j]; /* Additional Elimination for Gauss-Jordan */
-            y[i] = y[i] - A[i][k] * y[k];
-            A[i][k] = 0.0;
-        }
+        division(k);
+
+        elimination(k);        
+        
+        // jordan(k);
     }
 }
 

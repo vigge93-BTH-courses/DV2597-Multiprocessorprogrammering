@@ -18,8 +18,8 @@ rg: gauss
 	./gaussjordanseq.exe
 	./gaussjordanpar.exe
 rgc: gauss
-	./gaussjordanseq.exe -P 1 > seq
-	./gaussjordanpar.exe -P 1 > par
+	./gaussjordanseq.exe -P 1 -I fast -n 1024 > seq
+	./gaussjordanpar.exe -P 1 -I fast -n 1024 > par
 	FC par seq
 clean:
 	rm *.exe
