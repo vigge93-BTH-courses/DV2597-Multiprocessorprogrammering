@@ -7,19 +7,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <iostream>
+#include <chrono>
 #include <cuda.h>
 
 #define MAX_SIZE 4096
 
 typedef double matrix[MAX_SIZE][MAX_SIZE];
 
-int	N;		/* matrix size		*/
+int	N;		/* matrix size */
 int	maxnum;		/* max number of element*/
 char* Init;		/* matrix init type	*/
-int	PRINT;		/* print switch		*/
-matrix	A;		/* matrix A		*/
-double	b[MAX_SIZE];	/* vector b             */
-double	y[MAX_SIZE];	/* vector y             */
+int	PRINT;		/* print switch */
+matrix	A;		/* matrix A	*/
+double	b[MAX_SIZE];	/* vector b */
+double	y[MAX_SIZE];	/* vector y */
 
 /* forward declarations */
 void work(void);
@@ -38,7 +40,10 @@ main(int argc, char** argv)
     Init_Default();		/* Init default values	*/
     Read_Options(argc, argv);	/* Read arguments	*/
     Init_Matrix();		/* Init the matrix	*/
+    auto start = std::chrono::steady_clock::now();
     work();
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
     if (PRINT == 1)
         Print_Matrix();
 }
@@ -52,12 +57,13 @@ __global__
 void division_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stride) {
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x + k; // start thread index at k since all indexes < k is already eliminated.
     if (t_idx >= N) return; // Guard clause
+    double A_kk = A_d[getIndex(k, k)];
     for (int j = t_idx + 1; j < N; j += stride) {
-        A_d[getIndex(k, j)] = A_d[getIndex(k, j)] / A_d[getIndex(k, k)]; /* Division step */
+        A_d[getIndex(k, j)] = A_d[getIndex(k, j)] / A_kk; /* Division step */
     }
     if (t_idx == k) { // Only execute once per kernel launch
-        y_d[k] = b_d[k] / A_d[getIndex(k, k)];
-        A_d[getIndex(k, k)] = 1.0;
+        y_d[k] = b_d[k] / A_kk;
+        A_d[getIndex(k, k)] = 1.0; // This causes race condition
     }
 }
 
@@ -92,7 +98,7 @@ work(void)
 {
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
     int blocks = 1;
-    int threads_per_block = 48;
+    int threads_per_block = 1024;
     int stride = blocks*threads_per_block;
     double *A_d;
     double *b_d, *y_d;
@@ -111,12 +117,12 @@ work(void)
         elimination_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
 
-        // jordan_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
+        jordan_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
     }
-    for (int i = 0; i < MAX_SIZE; i++) {
-        cudaMemcpy(A[i], &A_d[i*MAX_SIZE], MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
-    }
+    // for (int i = 0; i < MAX_SIZE; i++) {
+    //     cudaMemcpy(A[i], &A_d[i*MAX_SIZE], MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
+    // }
     cudaMemcpy(b, b_d, MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(y, y_d, MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(A_d);

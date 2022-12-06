@@ -5,8 +5,8 @@ oddpar: oddevensortpar.cu
 	nvcc -o oddevensortpar oddevensortpar.cu
 	nvcc -o oddevensortpar2 oddevensortpar2.cu
 odd: oddseq oddpar
-gaussseq: gaussjordanseq.c
-	gcc -O2 -o gaussjordanseq.exe gaussjordanseq.c
+gaussseq: gaussjordanseq.cpp
+	g++ --std=c++11 -O2 -o gaussjordanseq.exe gaussjordanseq.cpp
 gausspar: gaussjordanpar.cu
 	nvcc -lineinfo -o gaussjordanpar gaussjordanpar.cu
 gauss: gaussseq gausspar
@@ -18,9 +18,13 @@ rg: gauss
 	./gaussjordanseq.exe
 	./gaussjordanpar.exe
 rgc: gauss
-	./gaussjordanseq.exe -P 1 -I fast -n 1024 > seq
-	./gaussjordanpar.exe -P 1 -I fast -n 1024 > par
+	./gaussjordanseq.exe -P 1 -I fast > seq
+	./gaussjordanpar.exe -P 1 -I fast > par
 	FC par seq
+rgb: gauss
+	./gaussjordanseq.exe
+	./gaussjordanpar.exe
+	
 clean:
 	rm *.exe
 	rm *.exp

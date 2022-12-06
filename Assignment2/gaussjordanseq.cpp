@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <iostream>
+#include <chrono>
 
 #define MAX_SIZE 4096
 
@@ -17,8 +19,8 @@ int	maxnum;		/* max number of element*/
 char* Init;		/* matrix init type	*/
 int	PRINT;		/* print switch		*/
 matrix	A;		/* matrix A		*/
-double	b[MAX_SIZE];	/* vector b             */
-double	y[MAX_SIZE];	/* vector y             */
+double	b[MAX_SIZE];	/* vector b */
+double	y[MAX_SIZE];	/* vector y */
 
 /* forward declarations */
 void work(void);
@@ -37,7 +39,10 @@ main(int argc, char** argv)
     Init_Default();		/* Init default values	*/
     Read_Options(argc, argv);	/* Read arguments	*/
     Init_Matrix();		/* Init the matrix	*/
+    auto start = std::chrono::steady_clock::now();
     work();
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
     if (PRINT == 1)
         Print_Matrix();
 }
@@ -76,9 +81,9 @@ work(void)
     for (k = 0; k < N; k++) { /* Outer loop */
         division(k);
 
-        elimination(k);        
+        elimination(k);
         
-        // jordan(k);
+        jordan(k);
     }
 }
 
@@ -202,4 +207,5 @@ Read_Options(int argc, char** argv)
                 printf("HELP: try %s -u \n\n", prog);
                 break;
             }
+    return 0;
 }
