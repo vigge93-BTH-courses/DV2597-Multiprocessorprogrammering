@@ -57,14 +57,13 @@ __global__
 void division_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stride) {
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x + k; // start thread index at k since all indexes < k is already eliminated.
     if (t_idx >= N) return; // Guard clause
-
     double A_kk = A_d[getIndex(k, k)];
     for (int j = t_idx + 1; j < N; j += stride) {
         A_d[getIndex(k, j)] = A_d[getIndex(k, j)] / A_kk; /* Division step */
     }
     if (t_idx == k) { // Only execute once per kernel launch
         y_d[k] = b_d[k] / A_kk;
-        // A_d[getIndex(k, k)] = 1.0; // This causes race condition
+        A_d[getIndex(k, k)] = 1.0; // This causes race condition
     }
 }
 
@@ -72,14 +71,9 @@ __global__
 void elimination_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stride) {
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x + k;
     if (t_idx >= N) return; // Guard clause
-    if (t_idx == k) { // Only execute once per kernel launch
-        // y_d[k] = b_d[k] / A_kk;
-        A_d[getIndex(k, k)] = 1.0;
-    }
     for (int i = t_idx + 1; i < N; i += stride) {
-        double A_ik = A_d[getIndex(i, k)]
         for (int j = k + 1; j < N; j++) {
-            A_d[getIndex(i, j)] = A_d[getIndex(i, j)] - A_ik * A_d[getIndex(k, j)]; /* Elimination step */
+            A_d[getIndex(i, j)] = A_d[getIndex(i, j)] - A_d[getIndex(i, k)] * A_d[getIndex(k, j)]; /* Elimination step */
         }
         b_d[i] = b_d[i] - A_d[getIndex(i, k)] * y_d[k];
         A_d[getIndex(i, k)] = 0.0;
@@ -91,11 +85,10 @@ void jordan_kernel(double *A_d, double *b_d, double *y_d, int N, int k, int stri
     int t_idx = threadIdx.x + blockDim.x*blockIdx.x;
     if (t_idx >= k) return; // Guard clause
     for (int i = t_idx; i < k; i += stride) {
-        double A_ik = A_d[getIndex(i, k)]
         for (int j = k + 1; j < N; j++) {
-            A_d[getIndex(i, j)] = A_d[getIndex(i, j)] - A_ik * A_d[getIndex(k, j)]; /* Additional Elimination for Gauss-Jordan */
+            A_d[getIndex(i, j)] = A_d[getIndex(i, j)] - A_d[getIndex(i, k)] * A_d[getIndex(k, j)]; /* Additional Elimination for Gauss-Jordan */
         }
-        y_d[i] = y_d[i] - A_ik * y_d[k];
+        y_d[i] = y_d[i] - A_d[getIndex(i, k)] * y_d[k];
         A_d[getIndex(i, k)] = 0.0;
     }
 }
@@ -104,7 +97,7 @@ void
 work(void)
 {
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    int blocks = 4;
+    int blocks = 1;
     int threads_per_block = 1024;
     int stride = blocks*threads_per_block;
     double *A_d;
@@ -118,7 +111,6 @@ work(void)
     cudaMemcpy(b_d, b, MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(y_d, y, MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
     for (int k = 0; k < N; k++) { /* Outer loop */
-        auto end = std::chrono::steady_clock::now();
         division_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
 
@@ -127,8 +119,6 @@ work(void)
 
         jordan_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k, stride);
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
-        auto end = std::chrono::steady_clock::now();
-        std::cout << "Elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
     }
     // for (int i = 0; i < MAX_SIZE; i++) {
     //     cudaMemcpy(A[i], &A_d[i*MAX_SIZE], MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
