@@ -63,29 +63,29 @@ void division_kernel(double *A_d, double *b_d, double *y_d, int N, int k) {
 
 __global__
 void elimination_kernel(double *A_d, double *b_d, double *y_d, int N, int k) {
-    int t_idx = threadIdx.x + blockDim.x*blockIdx.x; // col
-    int t_idy = threadIdx.y + blockDim.y*blockIdx.y; // row
+    int t_idx = threadIdx.x + blockDim.x*blockIdx.x;
     A_d[getIndex(k, k)] = 1.0;
     
-    if (t_idy == k || t_idy >= N) return; // Guard clauses
+    if (t_idx == k || t_idx >= N) return; // Guard clause
 
-    if (t_idx == 0) {
-        double* ptr = t_idy > k ? &b_d[t_idy] : &y_d[t_idy];
-        *ptr = *ptr - A_d[getIndex(t_idy, k)] * y_d[k];
-        A_d[getIndex(t_idy, k)] = 0.0;
+    double A_ik = A_d[getIndex(t_idx, k)];
+
+    double* ptr = t_idx > k ? &b_d[t_idx] : &y_d[t_idx];
+    *ptr = *ptr - A_ik * y_d[k];
+    A_d[getIndex(t_idx, k)] = 0.0;
+    
+    for (int j = k + 1; j < N; j++) {
+        A_d[getIndex(t_idx, j)] = A_d[getIndex(t_idx, j)] - A_ik * A_d[getIndex(k, j)]; /* Elimination step */
     }
-    if (t_idx <= k || t_idx >= N) return;
-    A_d[getIndex(t_idy, t_idx)] = A_d[getIndex(t_idy, t_idx)] - A_d[getIndex(t_idy, k)] * A_d[getIndex(k, t_idx)]; /* Elimination step */    
+    
 }
 
 void
 work(void)
 {
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    int divBlocks = 2;
-    int threads_per_blockdiv = 2;
-    dim3 elBlocks(2, 2, 1);
-    dim3 threads_per_blockel = (2, 2, 1);
+    int blocks = 2;
+    int threads_per_block = 2;
     double *A_d;
     double *b_d, *y_d;
     cudaMalloc((void**)&A_d,MAX_SIZE*MAX_SIZE*sizeof(double));
@@ -96,21 +96,21 @@ work(void)
     }
     cudaMemcpy(b_d, b, MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(y_d, y, MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
-    // auto start = std::chrono::steady_clock::now();
-    // auto end = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
+    auto end = std::chrono::steady_clock::now();
     for (int k = 0; k < N; k++) { /* Outer loop */
-        // start = std::chrono::steady_clock::now();
-        division_kernel<<<divBlocks, threads_per_blockdiv>>>(A_d, b_d, y_d, N, k);
+        start = std::chrono::steady_clock::now();
+        division_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k);
         cudaDeviceSynchronize();
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
-        // end = std::chrono::steady_clock::now();
+        end = std::chrono::steady_clock::now();
         // std::cout << "Division elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
 
-        // start = std::chrono::steady_clock::now();
-        elimination_kernel<<<elBlocks, threads_per_blockel>>>(A_d, b_d, y_d, N, k);
+        start = std::chrono::steady_clock::now();
+        elimination_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k);
         cudaDeviceSynchronize();
         // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
-        // end = std::chrono::steady_clock::now();
+        end = std::chrono::steady_clock::now();
         // std::cout << "Elimination elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
     }
     // for (int i = 0; i < MAX_SIZE; i++) {
