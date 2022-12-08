@@ -13,12 +13,16 @@ void swap(int *a, int *b) {
 }
 
 __global__
-void oddEvenSort_kernel(int* numbers_d, int n, int stride, bool odd) {
+void oddEvenSort_kernel(int* numbers_d, int n, int stride) {
     int t_idx = (threadIdx.x + blockDim.x*blockIdx.x)*2;
     if (t_idx >= n) return;
-    t_idx += odd ? 1 : 0;
-    for (int j = t_idx; j < n; j += stride) {
-        numbers_d[j] > numbers_d[j + 1] ? swap(&numbers_d[j], &numbers_d[j + 1]) : NULL;
+    for (int i = 0; i <= n; i++) {
+        int idx = t_idx;
+        idx += (i+1) % 2 == 1 ? 1 : 0;
+        for (int j = idx; j < n; j += stride) {
+            numbers_d[j] > numbers_d[j + 1] ? swap(&numbers_d[j], &numbers_d[j + 1]) : NULL;
+        }
+        __syncthreads();
     }
 }
 
@@ -27,17 +31,15 @@ void oddEvenSort_kernel(int* numbers_d, int n, int stride, bool odd) {
 void oddeven_sort(std::vector<int>& numbers)
 {
     auto s = numbers.size();
-    int num_blocks = 50;
+    int num_blocks = 1;
     int threads_per_block = 1024;
 
     int* numbers_d;
-    int stride = num_blocks*threads_per_block*2;
+    int stride = threads_per_block*2;
     auto s_bytes = s*sizeof(int);
     cudaMalloc((void**)&numbers_d, s_bytes);
     cudaMemcpy(numbers_d, &numbers[0], s_bytes, cudaMemcpyHostToDevice);
-    for (int i = 0; i <= s; i++) {
-        oddEvenSort_kernel<<<num_blocks, threads_per_block>>>(numbers_d, s, stride, (i+1)%2 == 1);
-    }
+    oddEvenSort_kernel<<<num_blocks, threads_per_block>>>(numbers_d, s, stride);
     std::cout <<"Error: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
     cudaMemcpy(&numbers[0], numbers_d, s_bytes, cudaMemcpyDeviceToHost);
     cudaFree(numbers_d);
@@ -50,7 +52,7 @@ void print_sort_status(std::vector<int> numbers)
 
 int main()
 {
-    constexpr unsigned int size = 100'000; // Number of elements in the input
+    constexpr unsigned int size = 524'288; // Number of elements in the input, 2^19
 
     // Initialize a vector with integers of value 0
     std::vector<int> numbers(size);
@@ -58,7 +60,7 @@ int main()
     srand(time(0));
     std::generate(numbers.begin(), numbers.end(), rand);
 
-    print_sort_status(numbers);
+    // print_sort_status(numbers);
     auto start = std::chrono::steady_clock::now();
     oddeven_sort(numbers);
     auto end = std::chrono::steady_clock::now();

@@ -1,31 +1,51 @@
-main: odd gaussseq
-oddseq: oddevensortseq.cpp
-	g++ -std=c++11 -O2 -o oddevensortseq.exe oddevensortseq.cpp
-oddpar: oddevensortpar.cu
-	nvcc -o oddevensortpar oddevensortpar.cu
-	nvcc -o oddevensortpar2 oddevensortpar2.cu
-odd: oddseq oddpar
-gaussseq: gaussjordanseq.cpp
-	g++ --std=c++11 -O2 -o gaussjordanseq.exe gaussjordanseq.cpp
-gausspar: gaussjordanpar.cu
-	nvcc -lineinfo -o gaussjordanpar gaussjordanpar.cu
+main: oddeven gauss
+oddeven: oddevenseq oddevenpar
 gauss: gaussseq gausspar
-ro: odd
-	./oddevensortpar.exe
-	./oddevensortpar2.exe
+
+oddevenseq: oddevensortseq.exe
+oddevensortseq.exe: oddevensortseq.cpp
+	g++ -std=c++11 -O2 -o oddevensortseq.exe oddevensortseq.cpp
+oddevenpar: oddevensortpar_v1.exe oddevensortpar_v2.exe
+oddevensortpar_v1.exe: oddevensortpar_v1.cu
+	nvcc -o oddevensortpar_v1 oddevensortpar_v1.cu
+oddevensortpar_v2.exe: oddevensortpar_v2.cu
+	nvcc -o oddevensortpar_v2 oddevensortpar_v2.cu
+
+gaussseq: gaussjordanseq.exe
+gaussjordanseq.exe: gaussjordanseq.cpp
+	g++ --std=c++11 -O2 -o gaussjordanseq.exe gaussjordanseq.cpp
+gausspar: gaussjordanpar_v1.exe gaussjordanpar_v2.exe gaussjordanpar_v3.exe
+gaussjordanpar_v1.exe: gaussjordanpar_v1.cu
+	nvcc -lineinfo -o gaussjordanpar_v1 gaussjordanpar_v1.cu
+gaussjordanpar_v2.exe: gaussjordanpar_v2.cu
+	nvcc -lineinfo -o gaussjordanpar_v2 gaussjordanpar_v2.cu
+gaussjordanpar_v3.exe: gaussjordanpar_v3.cu
+	nvcc -lineinfo -o gaussjordanpar_v3 gaussjordanpar_v3.cu
+
+run_oddeven: oddeven
 	./oddevensortseq.exe
-rg: gauss
+	./oddevensortpar_v1.exe
+	./oddevensortpar_v2.exe
+run_gauss: gauss
 	./gaussjordanseq.exe
-	./gaussjordanpar.exe
-rgc: gauss
-	./gaussjordanseq.exe -P 1 -I fast > seq
-	./gaussjordanpar.exe -P 1 -I fast > par
+	./gaussjordanpar_v1.exe
+	./gaussjordanpar_v2.exe
+	./gaussjordanpar_v3.exe
+run_both: oddeven gauss run_oddeven run_gauss
+run_compare_gauss: gauss
+	./gaussjordanseq.exe -P 1 > seq
+	./gaussjordanpar_v3.exe -P 1 > par
 	FC par seq
-rgb: gauss
-	./gaussjordanseq.exe
-	./gaussjordanpar.exe
-	
+run_benchmark: oddevensortseq.exe oddevensortpar_v2.exe gaussjordanseq.exe gaussjordanpar_v3.exe
+	for number in 1 2 3 4 5; do \
+		echo $$number; \
+		./oddevensortseq.exe >> oddevenseq ; \
+		./oddevensortpar_v2.exe >> oddevenpar ;\
+		./gaussjordanseq.exe >> gaussseq ; \
+		./gaussjordanpar_v3.exe >> gausspar ; \
+	done
+
+clean_bench:
+	rm par seq oddevenseq oddevenpar gaussseq gausspar
 clean:
-	rm *.exe
-	rm *.exp
-	rm *.lib
+	rm *.exe *.exp *.lib

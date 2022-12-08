@@ -34,7 +34,7 @@ int
 main(int argc, char** argv)
 {
     srand(1);
-    printf("Gauss Jordan\n");
+    // printf("Gauss Jordan\n");
     // int i, timestart, timeend, iter;
 
     Init_Default();		/* Init default values	*/
@@ -135,10 +135,10 @@ Init_Matrix()
 {
     int i, j;
 
-    printf("\nsize      = %dx%d ", N, N);
-    printf("\nmaxnum    = %d \n", maxnum);
-    printf("Init	  = %s \n", Init);
-    printf("Initializing matrix...");
+    // printf("\nsize      = %dx%d ", N, N);
+    // printf("\nmaxnum    = %d \n", maxnum);
+    // printf("Init	  = %s \n", Init);
+    // printf("Initializing matrix...");
 
     if (strcmp(Init, "rand") == 0) {
         for (i = 0; i < N; i++) {
@@ -167,7 +167,7 @@ Init_Matrix()
         y[i] = 1.0;
     }
 
-    printf("done \n\n");
+    // printf("done \n\n");
     if (PRINT == 1)
         Print_Matrix();
 }

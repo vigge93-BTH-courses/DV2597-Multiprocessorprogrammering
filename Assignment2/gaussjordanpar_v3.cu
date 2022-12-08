@@ -33,9 +33,7 @@ int Read_Options(int, char**);
 int
 main(int argc, char** argv)
 {
-    srand(1);
-    printf("Gauss Jordan\n");
-    // int i, timestart, timeend, iter;
+    // printf("Gauss Jordan\n");
 
     Init_Default();		/* Init default values	*/
     Read_Options(argc, argv);	/* Read arguments	*/
@@ -49,75 +47,63 @@ main(int argc, char** argv)
 }
 
 __device__
-int getIndex(int y, int x) {
-    return x + y*MAX_SIZE;
+int getIndex(int y, int x, int N) {
+    return x + y*N;
 }
 
 __global__
-void division_kernel(double *A_d, double *b_d, double *y_d, int N, int k) {
-    int t_idx = threadIdx.x + blockDim.x*blockIdx.x + k+1; // start thread index at k+1 since all indexes <= k is already eliminated.
-    y_d[k] = b_d[k] / A_d[getIndex(k, k)];
-    if (t_idx >= N) return; // Guard clause
-    A_d[getIndex(k, t_idx)] = A_d[getIndex(k, t_idx)] / A_d[getIndex(k, k)];; /* Division step */
+void divisionKernel(double *A_d, double *b_d, double *y_d, int N, int k) {
+    int tIdX = threadIdx.x + blockDim.x*blockIdx.x + k+1; // Start thread index at k+1 since all indexes <= k is already eliminated.
+    y_d[k] = b_d[k] / A_d[getIndex(k, k, N)]; // Idempotent operation within a kernel launch.
+    if (tIdX >= N) return; // Guard statement
+    A_d[getIndex(k, tIdX, N)] = A_d[getIndex(k, tIdX, N)] / A_d[getIndex(k, k, N)];; /* Division step */
 }
 
 __global__
-void elimination_kernel(double *A_d, double *b_d, double *y_d, int N, int k) {
-    int t_idx = threadIdx.x + blockDim.x*blockIdx.x;
-    A_d[getIndex(k, k)] = 1.0;
+void eliminationKernel(double *A_d, double *b_d, double *y_d, int N, int k) {
+    int tIdX = threadIdx.x + blockDim.x*blockIdx.x; // column
+    int tIdY = threadIdx.y + blockDim.y*blockIdx.y; // row
+    A_d[getIndex(k, k, N)] = 1.0; // We set A[k][k] to 1 here in order to avoid race condition in division kernel. Idempotent operation
     
-    if (t_idx == k || t_idx >= N) return; // Guard clause
+    if (tIdY == k || tIdY >= N) return; // Guard statement
 
-    double A_ik = A_d[getIndex(t_idx, k)];
-
-    double* ptr = t_idx > k ? &b_d[t_idx] : &y_d[t_idx];
-    *ptr = *ptr - A_ik * y_d[k];
-    A_d[getIndex(t_idx, k)] = 0.0;
-    
-    for (int j = k + 1; j < N; j++) {
-        A_d[getIndex(t_idx, j)] = A_d[getIndex(t_idx, j)] - A_ik * A_d[getIndex(k, j)]; /* Elimination step */
+    if (tIdX == 0) { // Run exactly once per iteration.
+        double* ptr = tIdY > k ? &b_d[tIdY] : &y_d[tIdY];
+        *ptr = *ptr - A_d[getIndex(tIdY, k, N)] * y_d[k];
     }
-    
+
+    if (tIdX <= k || tIdX >= N) return; // Guard statement
+    A_d[getIndex(tIdY, tIdX, N)] = A_d[getIndex(tIdY, tIdX, N)] - A_d[getIndex(tIdY, k, N)] * A_d[getIndex(k, tIdX, N)]; /* Elimination step */
 }
 
 void
 work(void)
 {
-    /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    int blocks = 2;
-    int threads_per_block = 2;
+    int threadsPerDivideBlock = 256;
+    dim3 threadsPerEliminationBlock(16, 16, 1);
+    int noDivideBlocks = ceil(N/(float)threadsPerDivideBlock);
+    dim3 eliminationBlocks(ceil(N/(float)threadsPerEliminationBlock.x), ceil(N/(float)threadsPerEliminationBlock.y), 1);
+    
     double *A_d;
     double *b_d, *y_d;
-    cudaMalloc((void**)&A_d,MAX_SIZE*MAX_SIZE*sizeof(double));
-    cudaMalloc((void**)&b_d,MAX_SIZE*sizeof(double));
-    cudaMalloc((void**)&y_d,MAX_SIZE*sizeof(double));
-    for (int i = 0; i < MAX_SIZE; i++) {
-        cudaMemcpy(&A_d[i*MAX_SIZE], A[i], MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
+    
+    cudaMalloc((void**)&A_d,N*N*sizeof(double));
+    cudaMalloc((void**)&b_d,N*sizeof(double));
+    cudaMalloc((void**)&y_d,N*sizeof(double));
+    
+    for (int i = 0; i < N; i++) {
+        cudaMemcpy(&A_d[i*N], A[i], N*sizeof(double), cudaMemcpyHostToDevice);
     }
-    cudaMemcpy(b_d, b, MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(y_d, y, MAX_SIZE*sizeof(double), cudaMemcpyHostToDevice);
-    auto start = std::chrono::steady_clock::now();
-    auto end = std::chrono::steady_clock::now();
-    for (int k = 0; k < N; k++) { /* Outer loop */
-        start = std::chrono::steady_clock::now();
-        division_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k);
-        cudaDeviceSynchronize();
-        // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
-        end = std::chrono::steady_clock::now();
-        // std::cout << "Division elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
-
-        start = std::chrono::steady_clock::now();
-        elimination_kernel<<<blocks, threads_per_block>>>(A_d, b_d, y_d, N, k);
-        cudaDeviceSynchronize();
-        // printf("Error: %s\n", cudaGetErrorString(cudaGetLastError()));
-        end = std::chrono::steady_clock::now();
-        // std::cout << "Elimination elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
+    cudaMemcpy(b_d, b, N*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(y_d, y, N*sizeof(double), cudaMemcpyHostToDevice);
+    
+    for (int k = 0; k < N; k++) {
+        divisionKernel<<<noDivideBlocks, threadsPerDivideBlock>>>(A_d, b_d, y_d, N, k);
+        eliminationKernel<<<eliminationBlocks, threadsPerEliminationBlock>>>(A_d, b_d, y_d, N, k);
     }
-    // for (int i = 0; i < MAX_SIZE; i++) {
-    //     cudaMemcpy(A[i], &A_d[i*MAX_SIZE], MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
-    // }
-    cudaMemcpy(b, b_d, MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(y, y_d, MAX_SIZE*sizeof(double), cudaMemcpyDeviceToHost);
+    
+    cudaMemcpy(y, y_d, N*sizeof(double), cudaMemcpyDeviceToHost); // We only care about the result vector
+    
     cudaFree(A_d);
     cudaFree(b_d);
     cudaFree(y_d);
@@ -128,10 +114,10 @@ Init_Matrix()
 {
     int i, j;
 
-    printf("\nsize      = %dx%d ", N, N);
-    printf("\nmaxnum    = %d \n", maxnum);
-    printf("Init	  = %s \n", Init);
-    printf("Initializing matrix...");
+    // printf("\nsize      = %dx%d ", N, N);
+    // printf("\nmaxnum    = %d \n", maxnum);
+    // printf("Init	  = %s \n", Init);
+    // printf("Initializing matrix...");
 
     if (strcmp(Init, "rand") == 0) {
         for (i = 0; i < N; i++) {
@@ -160,7 +146,7 @@ Init_Matrix()
         y[i] = 1.0;
     }
 
-    printf("done \n\n");
+    // printf("done \n\n");
     if (PRINT == 1)
         Print_Matrix();
 }

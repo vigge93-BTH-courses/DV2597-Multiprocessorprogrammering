@@ -24,7 +24,7 @@ void print_sort_status(std::vector<int> numbers)
 
 int main()
 {
-    constexpr unsigned int size = 100000; // Number of elements in the input
+    constexpr unsigned int size = 524288; // Number of elements in the input
 
     // Initialize a vector with integers of value 0
     std::vector<int> numbers(size);
@@ -32,7 +32,7 @@ int main()
     srand(time(0));
     std::generate(numbers.begin(), numbers.end(), rand);
 
-    print_sort_status(numbers);
+    // print_sort_status(numbers);
     auto start = std::chrono::steady_clock::now();
     oddeven_sort(numbers);
     auto end = std::chrono::steady_clock::now();
