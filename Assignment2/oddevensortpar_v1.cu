@@ -15,11 +15,11 @@ void swap(int *a, int *b) {
 __global__
 void oddEvenSort_kernel(int* numbers_d, int n, int stride) {
     int t_idx = (threadIdx.x + blockDim.x*blockIdx.x)*2;
-    if (t_idx >= n) return;
+    if (t_idx >= n-1) return;
     for (int i = 0; i <= n; i++) {
         int idx = t_idx;
         idx += (i+1) % 2 == 1 ? 1 : 0;
-        for (int j = idx; j < n; j += stride) {
+        for (int j = idx; j < n-1; j += stride) {
             numbers_d[j] > numbers_d[j + 1] ? swap(&numbers_d[j], &numbers_d[j + 1]) : NULL;
         }
         __syncthreads();

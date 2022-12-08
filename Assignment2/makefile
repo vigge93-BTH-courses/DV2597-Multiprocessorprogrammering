@@ -36,13 +36,19 @@ run_compare_gauss: gauss
 	./gaussjordanseq.exe -P 1 > seq
 	./gaussjordanpar_v3.exe -P 1 > par
 	FC par seq
-run_benchmark: oddevensortseq.exe oddevensortpar_v2.exe gaussjordanseq.exe gaussjordanpar_v3.exe
+run_benchmark: oddevensortseq.exe oddevensortpar_v1.exe oddevensortpar_v2.exe gaussjordanseq.exe gaussjordanpar_v3.exe
 	for number in 1 2 3 4 5; do \
 		echo $$number; \
 		./oddevensortseq.exe >> oddevenseq ; \
-		./oddevensortpar_v2.exe >> oddevenpar ;\
+		echo Oddevenseq done; \
+		./oddevensortpar_v1.exe >> oddevenpar_v1 ;\
+		echo Oddevenpar1 done; \
+		./oddevensortpar_v2.exe >> oddevenpar_v2 ;\
+		echo Oddevenpar2 done; \
 		./gaussjordanseq.exe >> gaussseq ; \
+		echo gaussseq done; \
 		./gaussjordanpar_v3.exe >> gausspar ; \
+		echo gausspar done; \
 	done
 
 clean_bench:

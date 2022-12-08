@@ -15,9 +15,9 @@ void swap(int *a, int *b) {
 __global__
 void oddEvenSort_kernel(int* numbers_d, int n, int stride, bool odd) {
     int t_idx = (threadIdx.x + blockDim.x*blockIdx.x)*2;
-    if (t_idx >= n) return;
+    if (t_idx >= n-1) return;
     t_idx += odd ? 1 : 0;
-    for (int j = t_idx; j < n; j += stride) {
+    for (int j = t_idx; j < n-1; j += stride) {
         numbers_d[j] > numbers_d[j + 1] ? swap(&numbers_d[j], &numbers_d[j + 1]) : NULL;
     }
 }
@@ -27,8 +27,8 @@ void oddEvenSort_kernel(int* numbers_d, int n, int stride, bool odd) {
 void oddeven_sort(std::vector<int>& numbers)
 {
     auto s = numbers.size();
-    int num_blocks = 50;
     int threads_per_block = 1024;
+    int num_blocks = ceil(s/(threads_per_block*2.0));
 
     int* numbers_d;
     int stride = num_blocks*threads_per_block*2;
